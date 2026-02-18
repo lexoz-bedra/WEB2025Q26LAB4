@@ -4,6 +4,7 @@
   var FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
   var GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
   var LOCATION_NAME_GEO = 'Текущее местоположение';
+  var STORAGE_KEY = 'weather-app-locations';
 
   var weatherCodes = {
     0: 'Ясно',
@@ -148,6 +149,7 @@
       btn.setAttribute('aria-selected', i === state.currentIndex);
       btn.addEventListener('click', function () {
         state.currentIndex = i;
+        saveState();
         renderTabs();
         loadWeatherForCurrent();
       });
@@ -156,10 +158,39 @@
     });
   }
 
+  function saveState() {
+    try {
+      var data = {
+        locations: state.locations,
+        currentIndex: state.currentIndex
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data.locations || !Array.isArray(data.locations) || data.locations.length === 0) return null;
+      var locations = data.locations.filter(function (loc) {
+        return loc && typeof loc.name === 'string' && typeof loc.lat === 'number' && typeof loc.lon === 'number';
+      });
+      if (locations.length === 0) return null;
+      var currentIndex = typeof data.currentIndex === 'number' ? data.currentIndex : 0;
+      if (currentIndex < 0 || currentIndex >= locations.length) currentIndex = 0;
+      return { locations: locations, currentIndex: currentIndex };
+    } catch (e) {
+      return null;
+    }
+  }
+
   function addLocation(name, lat, lon) {
     var id = 'loc-' + Date.now();
     state.locations.push({ id: id, name: name, lat: lat, lon: lon });
     state.currentIndex = state.locations.length - 1;
+    saveState();
     renderTabs();
     loadWeatherForCurrent();
   }
@@ -323,7 +354,15 @@
         hideDropdown();
       }
     });
-    requestGeo();
+    var saved = loadState();
+    if (saved && saved.locations.length > 0) {
+      state.locations = saved.locations;
+      state.currentIndex = saved.currentIndex;
+      renderTabs();
+      loadWeatherForCurrent();
+    } else {
+      requestGeo();
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);
