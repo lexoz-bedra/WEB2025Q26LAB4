@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Прогноз погоды</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1 class="header__title">Прогноз погоды</h1>
+      <button type="button" class="btn btn_refresh" aria-label="Обновить">Обновить</button>
+    </header>
+
+    <main class="main">
+      <section class="locations">
+        <ul class="locations__tabs" role="tablist"></ul>
+        <div class="locations__content" role="tabpanel"></div>
+      </section>
+
+      <section class="weather" aria-live="polite">
+        <div class="weather__state weather__state_loading" hidden>
+          <p class="weather__message">Загрузка...</p>
+        </div>
+        <div class="weather__state weather__state_error" hidden>
+          <p class="weather__message"></p>
+        </div>
+        <div class="weather__state weather__state_success" hidden>
+          <h2 class="weather__location"></h2>
+          <div class="weather__days"></div>
+        </div>
+      </section>
+
+      <section class="add-city">
+        <button type="button" class="btn btn_add-city">Добавить город</button>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="modal-city" hidden aria-modal="true" aria-labelledby="modal-city-title">
+    <div class="modal__backdrop"></div>
+    <div class="modal__box">
+      <h2 id="modal-city-title" class="modal__title">Введите город</h2>
+      <form class="modal__form" id="form-city" novalidate>
+        <div class="form-group">
+          <label for="input-city" class="form-group__label">Город</label>
+          <input type="text" id="input-city" class="form-group__input" autocomplete="off" placeholder="Начните вводить название">
+          <div class="form-group__dropdown" id="dropdown-cities" hidden></div>
+          <p class="form-group__error" id="input-city-error" role="alert" hidden></p>
+        </div>
+        <div class="modal__actions">
+          <button type="submit" class="btn btn_primary">Добавить</button>
+          <button type="button" class="btn btn_secondary modal__close">Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
