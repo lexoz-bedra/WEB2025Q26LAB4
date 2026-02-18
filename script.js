@@ -31,7 +31,9 @@
 
   var state = {
     locations: [],
-    currentIndex: 0
+    currentIndex: 0,
+    selectedSuggestion: null,
+    dropdownDebounce: null
   };
 
   var dom = {};
@@ -56,6 +58,8 @@
     dom.modal = getById('modal-city');
     dom.formCity = getById('form-city');
     dom.inputCity = getById('input-city');
+    dom.dropdown = getById('dropdown-cities');
+    dom.inputCityError = getById('input-city-error');
     dom.modalClose = getBySelector('.modal__close');
     dom.modalBackdrop = getBySelector('.modal__backdrop');
   }
@@ -163,11 +167,79 @@
   function openCityModal() {
     dom.modal.hidden = false;
     dom.inputCity.value = '';
+    state.selectedSuggestion = null;
+    hideDropdown();
+    hideCityError();
     dom.inputCity.focus();
   }
 
   function closeCityModal() {
     dom.modal.hidden = true;
+    hideDropdown();
+  }
+
+  function hideDropdown() {
+    dom.dropdown.hidden = true;
+    dom.dropdown.innerHTML = '';
+  }
+
+  function showCityError(message) {
+    dom.inputCityError.textContent = message || '';
+    dom.inputCityError.hidden = !message;
+    dom.inputCity.classList.toggle('form-group__input_invalid', !!message);
+  }
+
+  function hideCityError() {
+    showCityError('');
+  }
+
+  function fetchCitySuggestions(query) {
+    if (!query || query.length < 2) return Promise.resolve([]);
+    var url = GEOCODE_URL + '?name=' + encodeURIComponent(query) + '&count=5&language=ru';
+    return fetch(url).then(function (res) {
+      if (!res.ok) return [];
+      return res.json();
+    }).then(function (data) {
+      return (data.results && data.results.length) ? data.results : [];
+    }).catch(function () {
+      return [];
+    });
+  }
+
+  function showDropdown(results) {
+    dom.dropdown.innerHTML = '';
+    if (!results.length) {
+      dom.dropdown.hidden = true;
+      return;
+    }
+    results.forEach(function (r) {
+      var item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'form-group__dropdown-item';
+      item.textContent = r.name + (r.admin1 ? ', ' + r.admin1 : '');
+      item.addEventListener('click', function () {
+        dom.inputCity.value = r.name;
+        state.selectedSuggestion = { name: r.name, lat: r.latitude, lon: r.longitude };
+        hideDropdown();
+      });
+      dom.dropdown.appendChild(item);
+    });
+    dom.dropdown.hidden = false;
+  }
+
+  function onCityInput() {
+    state.selectedSuggestion = null;
+    hideCityError();
+    var query = dom.inputCity.value.trim();
+    if (state.dropdownDebounce) clearTimeout(state.dropdownDebounce);
+    if (query.length < 2) {
+      hideDropdown();
+      return;
+    }
+    state.dropdownDebounce = setTimeout(function () {
+      state.dropdownDebounce = null;
+      fetchCitySuggestions(query).then(showDropdown);
+    }, 300);
   }
 
   function requestGeo() {
@@ -207,15 +279,26 @@
   function onFormSubmit(e) {
     e.preventDefault();
     var name = dom.inputCity.value.trim();
-    if (!name) return;
+    hideCityError();
+    if (!name) {
+      showCityError('Введите название города');
+      return;
+    }
+    if (state.selectedSuggestion && state.selectedSuggestion.name === name) {
+      addLocation(state.selectedSuggestion.name, state.selectedSuggestion.lat, state.selectedSuggestion.lon);
+      closeCityModal();
+      return;
+    }
     showWeatherState('loading');
-    closeCityModal();
     geocodeCity(name)
       .then(function (geo) {
         addLocation(geo.name, geo.lat, geo.lon);
+        closeCityModal();
       })
       .catch(function (err) {
-        showWeatherState('error', err.message || 'Не удалось найти город');
+        showWeatherState('success');
+        dom.weatherSuccess.hidden = state.locations.length === 0;
+        showCityError(err.message || 'Город не найден. Выберите город из списка.');
       });
   }
 
@@ -229,8 +312,17 @@
     dom.btnRefresh.addEventListener('click', onRefresh);
     dom.btnAddCity.addEventListener('click', openCityModal);
     dom.formCity.addEventListener('submit', onFormSubmit);
+    dom.inputCity.addEventListener('input', onCityInput);
+    dom.inputCity.addEventListener('focus', function () {
+      if (dom.inputCity.value.trim().length >= 2 && dom.dropdown.innerHTML) dom.dropdown.hidden = false;
+    });
     dom.modalClose.addEventListener('click', closeCityModal);
     dom.modalBackdrop.addEventListener('click', closeCityModal);
+    document.addEventListener('click', function (e) {
+      if (dom.dropdown && !dom.dropdown.hidden && dom.inputCity && !dom.inputCity.contains(e.target) && !dom.dropdown.contains(e.target)) {
+        hideDropdown();
+      }
+    });
     requestGeo();
   }
 
